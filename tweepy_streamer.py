@@ -243,7 +243,7 @@ if __name__ == '__main__':
    
     #tweets = api.user_timeline(screen_name = 'Sheldon08638921', count = 200)
     #popular_tweets = twitter_client.search_tweets('$fb', 500, 'popular')
-    recent_tweets = twitter_client.search_tweets('$fb', 500, 'recent') 
+    recent_tweets = twitter_client.search_tweets('$fb', 500, 'recent')
     
     #popular_tweets_today = [tweet for tweet in popular_tweets if tweet.created_at.strftime("%Y-%m-%d") == date.today().strftime('%Y-%m-%d')]
     
