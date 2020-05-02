@@ -120,7 +120,7 @@ class TweetAnalyser():
     Functionality for analysing and categorising content from tweets.
     """
     def tweets_to_dataframe(self, pre_tweets):
-        #pre_tweets = [tweet for tweet in pre_tweets if tweet.created_at.date() == datetime.now().date()]
+        pre_tweets = [tweet for tweet in pre_tweets if tweet.created_at.date() == datetime.now().date()]
     
         pre_market = datetime.strptime('06:30', '%H:%M')
         market_open = datetime.strptime('09:30', '%H:%M')
@@ -130,11 +130,9 @@ class TweetAnalyser():
         end_session = datetime.strptime('19:00', '%H:%M')
         
         tweets = []
-        session = ''
         
         #nyc_datetime = datetime.datetime.now(pytz.timezone('US/Eastern')) tweets = [tweet for tweet in pre_tweets if pre_market.time() < datetime.now().time() < market_open.time()]
         for i in range(0, len(pre_tweets)):
-            print('here')
             if pre_market.time() < datetime.now().time() < market_open.time() and pre_market.time() < pre_tweets[i].created_at.time() < market_open.time():
                 tweets.append(pre_tweets[i])
                 session = 'Pre-market'
@@ -245,7 +243,7 @@ if __name__ == '__main__':
    
     #tweets = api.user_timeline(screen_name = 'Sheldon08638921', count = 200)
     #popular_tweets = twitter_client.search_tweets('$fb', 500, 'popular')
-    #recent_tweets = twitter_client.search_tweets('$fb', 500, 'recent')
+    recent_tweets = twitter_client.search_tweets('$fb', 500, 'recent') 
     
     #popular_tweets_today = [tweet for tweet in popular_tweets if tweet.created_at.strftime("%Y-%m-%d") == date.today().strftime('%Y-%m-%d')]
     
