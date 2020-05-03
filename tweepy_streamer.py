@@ -7,7 +7,8 @@ import datetime
 import pytz
 
 from datetime import date
-from datetime import datetime#, timedelta
+from datetime import datetime, timedelta
+import time
 
 from textblob import TextBlob
 from textblob import Word
@@ -119,38 +120,48 @@ class TweetAnalyser():
     """
     Functionality for analysing and categorising content from tweets.
     """
-    def tweets_to_dataframe(self, pre_tweets):
-        pre_tweets = [tweet for tweet in pre_tweets if tweet.created_at.date() == datetime.now().date()]
+    def tweets_to_dataframe(self, pre_tweets, ticker):
+        current_datetime = datetime.utcnow()
+        
+        #pre_tweets = [tweet for tweet in pre_tweets if tweet.created_at.date() == current_datetime.date()]
     
-        pre_market = datetime.strptime('06:30', '%H:%M')
-        market_open = datetime.strptime('09:30', '%H:%M')
-        lunch = datetime.strptime('11:30', '%H:%M')
-        post_lunch = datetime.strptime('13:00', '%H:%M')
-        after_market = datetime.strptime('15:30', '%H:%M')
-        end_session = datetime.strptime('19:00', '%H:%M')
+        pre_market = datetime.strptime('11:30', '%H:%M')
+        market_open = datetime.strptime('02:30', '%H:%M')
+        lunch = datetime.strptime('16:30', '%H:%M')
+        post_lunch = datetime.strptime('18:00', '%H:%M')
+        after_market = datetime.strptime('20:30', '%H:%M')
+        end_session = datetime.strptime('00:00', '%H:%M')
+        
+        if time.localtime().tm_isdst == 1:
+            pre_market = pre_market + timedelta(hours=-1)
+            market_open = market_open + timedelta(hours=-1)
+            lunch = lunch + timedelta(hours=-1)
+            post_lunch = post_lunch + timedelta(hours=-1)
+            after_market = after_market + timedelta(hours=-1)
+            end_session = end_session + timedelta(hours=-1)
+            
+        print('Open:', market_open.time())
+        print('GMT:', current_datetime.time())
         
         tweets = []
+        session = np.nan
         
-        #nyc_datetime = datetime.datetime.now(pytz.timezone('US/Eastern')) tweets = [tweet for tweet in pre_tweets if pre_market.time() < datetime.now().time() < market_open.time()]
         for i in range(0, len(pre_tweets)):
-            if pre_market.time() < datetime.now().time() < market_open.time() and pre_market.time() < pre_tweets[i].created_at.time() < market_open.time():
+            if pre_market.time() < current_datetime.time() < market_open.time() and pre_market.time() < pre_tweets[i].created_at.time() < market_open.time():
                 tweets.append(pre_tweets[i])
                 session = 'Pre-market'
-            elif market_open.time() < datetime.now().time() < lunch.time() and pre_market.time() < pre_tweets[i].created_at.time() < market_open.time():
+            elif market_open.time() < current_datetime.time() < lunch.time() and market_open.time() < pre_tweets[i].created_at.time() < lunch.time():
                 tweets.append(pre_tweets[i])
                 session = 'Open'
-            elif lunch.time() < datetime.now().time() < post_lunch.time() and pre_market.time() < pre_tweets[i].created_at.time() < market_open.time():
+            elif lunch.time() < current_datetime.time() < post_lunch.time() and lunch.time() < pre_tweets[i].created_at.time() < post_lunch.time():
                 tweets.append(pre_tweets[i])
                 session = 'Lunch'
-            elif post_lunch.time() < datetime.now().time() < after_market.time() and pre_market.time() < pre_tweets[i].created_at.time() < market_open.time():
+            elif post_lunch.time() < current_datetime.time() < after_market.time() and post_lunch.time() < pre_tweets[i].created_at.time() < after_market.time():
                 tweets.append(pre_tweets[i])
                 session = 'Post-lunch'
-            elif after_market.time() < datetime.now().time() < end_session.time() and pre_market.time() < pre_tweets[i].created_at.time() < market_open.time():
+            elif after_market.time() < current_datetime.time() < end_session.time() and after_market.time() < pre_tweets[i].created_at.time() < end_session.time():
                 tweets.append(pre_tweets[i])
                 session = 'After-market'
-            else:
-                session = np.nan
-                
             
             
         df = pd.DataFrame([tweet.full_text for tweet in tweets], columns = ['tweets'])
@@ -162,28 +173,8 @@ class TweetAnalyser():
         df['source'] = np.array([tweet.source for tweet in tweets])
         df['likes'] = np.array([tweet.favorite_count for tweet in tweets])
         df['retweets'] = np.array([tweet.retweet_count for tweet in tweets])
+        df['ticker'] = ticker[1:]
         df['trading_cycle'] = session
-        
-        #Old Delete
-        """pre_market = datetime.strptime('07:30', '%H:%M')
-        market_open = datetime.strptime('09:30', '%H:%M')
-        lunch = datetime.strptime('11:30', '%H:%M')
-        post_lunch = datetime.strptime('13:00', '%H:%M')
-        after_market = datetime.strptime('15:30', '%H:%M')
-        end_session = datetime.strptime('19:00', '%H:%M')
-        
-        #nyc_datetime = datetime.datetime.now(pytz.timezone('US/Eastern'))
-        for i in range(0, len(df.index)):
-            if pre_market.time() < df.iloc[i, df.columns.get_loc('date')].time() < market_open.time():
-                df.iloc[i, df.columns.get_loc('trading_cycle')] = 'Pre-market'
-            elif market_open.time() < df.iloc[i, df.columns.get_loc('date')].time() < lunch.time():
-                df.iloc[i, df.columns.get_loc('trading_cycle')] = 'Open'
-            elif lunch.time() < df.iloc[i, df.columns.get_loc('date')].time() < post_lunch.time():
-                df.iloc[i, df.columns.get_loc('trading_cycle')] = 'Lunch'
-            elif post_lunch.time() < df.iloc[i, df.columns.get_loc('date')].time() < after_market.time():
-                df.iloc[i, df.columns.get_loc('trading_cycle')] = 'Post-lunch'
-            elif after_market.time() < df.iloc[i, df.columns.get_loc('date')].time() < end_session.time():
-                df.iloc[i, df.columns.get_loc('trading_cycle')] = 'After-market'"""
         
         
         return df
@@ -194,24 +185,10 @@ class TweetAnalyser():
     def analyse_sentiment_polarity(self, tweet):
         analysis = TextBlob(self.clean_tweet(tweet))
         
-        # Return binary polarity
-        """if analysis.sentiment.polarity > 0:
-            return 1
-        elif analysis.sentiment.polarity == 0:
-            return 0
-        else:
-            return -1"""
-        
         return analysis.sentiment.polarity
     
     def analyse_sentiment_subjectivity(self, tweet):
         analysis = TextBlob(self.clean_tweet(tweet))
-        
-        # Return binary polarity
-        """if analysis.sentiment.subjectivity > 0.5:
-            return 1
-        else:
-            return -1"""
         
         return analysis.sentiment.subjectivity
         
@@ -240,49 +217,56 @@ if __name__ == '__main__':
     twitter_client = TwitterClient()
     tweet_analyser = TweetAnalyser()
     api = twitter_client.get_twitter_client_api()
+    
+    ticker = '$FB'
    
-    #tweets = api.user_timeline(screen_name = 'Sheldon08638921', count = 200)
-    #popular_tweets = twitter_client.search_tweets('$fb', 500, 'popular')
-    recent_tweets = twitter_client.search_tweets('$fb', 500, 'recent')
-    
-    #popular_tweets_today = [tweet for tweet in popular_tweets if tweet.created_at.strftime("%Y-%m-%d") == date.today().strftime('%Y-%m-%d')]
-    
+    popular_tweets = twitter_client.search_tweets(ticker, 50, 'popular')
+    recent_tweets = twitter_client.search_tweets(ticker, 50, 'recent')
     
 
-    df = tweet_analyser.tweets_to_dataframe(popular_tweets)
+    recent_df = tweet_analyser.tweets_to_dataframe(recent_tweets, ticker)
+    popular_df = tweet_analyser.tweets_to_dataframe(popular_tweets, ticker)
     
-    # Time Series  
-    """time_likes = pd.Series(data = df['likes'].values, index = df['date'])
-    time_likes.plot(figsize = (16, 4), label = 'likes', legend = True)
-    time_retweets = pd.Series(data = df['retweets'].values, index = df['date'])
-    time_retweets.plot(figsize = (16, 4), label = 'retweets', legend = True)
-    plt.show()"""
-
-    df['polarity'] = np.array([tweet_analyser.analyse_sentiment_polarity(tweet) for tweet in df['tweets']])
-    df['subjectivity'] = np.array([tweet_analyser.analyse_sentiment_subjectivity(tweet) for tweet in df['tweets']])
-    df['tense'] = np.array([tweet_analyser.determine_tense_input(tweet) for tweet in df['tweets']])
-    
-    
-
-
-
+    if 'full_df' not in locals():
+        full_df = recent_df
+    else:
+        full_df = full_df.append(recent_df)
+        
+    #full_df = full_df.append(popular_df)
 
     
     
-    
-    
-    
-    
-    
-# pd.set_option('display.max_colwidth', 50)
+    for index, row in popular_df.iterrows():
+        if row['id'] not in full_df['id'].tolist():
+            print('here')
+            full_df = full_df.append(row, ignore_index=True)
+        else:
+            for index2, row2 in full_df.iterrows():
+                print(index2)
+                if row2['id'] == row['id']:
+                    print('now here')
+                    print(index)
+                    print(index2)
+                    full_df.iloc[index2, full_df.columns.get_loc('likes')] = row['likes']
+                    full_df.iloc[index2, full_df.columns.get_loc('retweets')] = row['retweets']
+                    # row2['likes'] = row['likes']
+                    # row2['retweets'] = row['retweets']
 
-"""hash_tag_list = ['donald trump', 'hillary clinton', 'barack obama', 'bernie sanders']
-fetched_tweets_filename = 'tweets.json'
-twitter_streamer = TwitterStreamer()
-twitter_streamer.stream_tweets(fetched_tweets_filename, hash_tag_list)
-twitter_client =  TwitterClient('pycon')
-print(twitter_client.get_user_timeline_tweets(1))
-print(twitter_client.get_user_friend_list(1))"""
+
+
+    # df['polarity'] = np.array([tweet_analyser.analyse_sentiment_polarity(tweet) for tweet in df['tweets']])
+    # df['subjectivity'] = np.array([tweet_analyser.analyse_sentiment_subjectivity(tweet) for tweet in df['tweets']])
+    # df['tense'] = np.array([tweet_analyser.determine_tense_input(tweet) for tweet in df['tweets']])
     
     
+
+
+
+
+    
+    
+
+
+
+
     
