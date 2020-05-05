@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import re
-import datetime
+import sqlite3
 
-from datetime import date
-from datetime import datetime, timedelta
+import datetime
+from datetime import datetime
+from datetime import timedelta
 import time
 
 from textblob import TextBlob
@@ -13,9 +13,7 @@ from textblob import Word
 
 from tweepy import API
 from tweepy import Cursor
-from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler
-from tweepy import Stream
 
 import nltk
 #nltk.download('averaged_perceptron_tagger')
@@ -66,7 +64,7 @@ class TweetAnalyser():
         current_datetime = datetime.utcnow()
         
         # Remove tweets that were not posted today
-        pre_tweets = [tweet for tweet in pre_tweets if tweet.created_at.date() == current_datetime.date()]
+        #pre_tweets = [tweet for tweet in pre_tweets if tweet.created_at.date() == current_datetime.date()]
     
         # Set trading phase times
         pre_market = datetime.strptime('11:30', '%H:%M')
@@ -163,8 +161,8 @@ if __name__ == '__main__':
     ticker = '$FB'
     
     # Get tweets from Twitter API
-    popular_tweets = twitter_client.search_tweets(ticker, 50, 'popular')
-    recent_tweets = twitter_client.search_tweets(ticker, 50, 'recent')
+    popular_tweets = twitter_client.search_tweets(ticker, 500, 'popular')
+    recent_tweets = twitter_client.search_tweets(ticker, 500, 'recent')
 
     # Process tweets to DataFrame
     recent_df = tweet_analyser.tweets_to_dataframe(recent_tweets, ticker)
@@ -189,7 +187,18 @@ if __name__ == '__main__':
     # Apply NLP on full_df
     full_df['polarity'] = np.array([tweet_analyser.analyse_sentiment_polarity(tweet) for tweet in full_df['tweets']])
     full_df['subjectivity'] = np.array([tweet_analyser.analyse_sentiment_subjectivity(tweet) for tweet in full_df['tweets']])
-    full_df['tense'] = np.array([tweet_analyser.determine_tense_input(tweet) for tweet in full_df['tweets']])
+    #full_df['tense'] = np.array([tweet_analyser.determine_tense_input(tweet) for tweet in full_df['tweets']])
+    
+    conn = sqlite3.connect('buytherumour.db')
+    c = conn.cursor()
+    
+    full_df.to_sql(name='full_twitter_scrape', con=conn, if_exists='append')
+   # pd.read_sql('select * from full_twitter_scrape', conn)
+
+    
+    
+    
+    
     
     
 
