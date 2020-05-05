@@ -67,7 +67,7 @@ class TweetAnalyser():
         #pre_tweets = [tweet for tweet in pre_tweets if tweet.created_at.date() == current_datetime.date()]
     
         # Set trading phase times
-        pre_market = datetime.strptime('11:30', '%H:%M')
+        """pre_market = datetime.strptime('11:30', '%H:%M')
         market_open = datetime.strptime('14:30', '%H:%M')
         lunch = datetime.strptime('16:30', '%H:%M')
         post_lunch = datetime.strptime('18:00', '%H:%M')
@@ -105,8 +105,8 @@ class TweetAnalyser():
                 session = 'Post-lunch'
             elif after_market.time() < current_datetime.time() < end_session.time() and after_market.time() < pre_tweets[i].created_at.time() < end_session.time():
                 tweets.append(pre_tweets[i])
-                session = 'After-market'
-         
+                session = 'After-market'"""
+        tweets = pre_tweets
         # Create DataFrame of tweets and add columns
         df = pd.DataFrame([tweet.full_text for tweet in tweets], columns = ['tweets'])
         df['id'] = np.array([tweet.id for tweet in tweets])
@@ -116,7 +116,7 @@ class TweetAnalyser():
         df['likes'] = np.array([tweet.favorite_count for tweet in tweets])
         df['retweets'] = np.array([tweet.retweet_count for tweet in tweets])
         df['ticker'] = ticker[1:]
-        df['trading_cycle'] = session
+        #df['trading_cycle'] = session
         
         return df
 
@@ -149,6 +149,41 @@ class TweetAnalyser():
         tense["present"] = len([word for word in tagged if word[1] in ["VBP", "VBZ","VBG"]])
         tense["past"] = len([word for word in tagged if word[1] in ["VBD", "VBN"]]) 
         return(tense)
+    
+
+
+# # # TWITTER ANALYSER # # #      
+class ImportToDB():
+    """
+    Import dataframe to DB
+    """
+    
+    def to_dataframe(self, popular_df):
+        # Check if full dataframe object exists, if not initiate dataframe
+        if 'full_df' not in locals():
+            full_df = popular_df
+        else:
+            full_df = full_df.append(popular_df)
+        
+        # Add popular tweets to full_df, replace likes and retweets if popular tweet already exists in full_df
+        """for index, row in popular_df.iterrows():
+            if row['id'] not in full_df['id'].tolist():
+                full_df = full_df.append(row, ignore_index=True)
+            else:
+                for index2, row2 in full_df.iterrows():
+                    if row2['id'] == row['id']:
+                        full_df.iloc[index2, full_df.columns.get_loc('likes')] = row['likes']
+                        full_df.iloc[index2, full_df.columns.get_loc('retweets')] = row['retweets']"""
+        
+        return full_df
+    
+    def to_database(self, full_df):
+        conn = sqlite3.connect('buytherumour.db')
+        c = conn.cursor()
+        
+        full_df.to_sql(name='full_twitter_scrape', con=conn, if_exists='append')
+        # pd.read_sql('select * from full_twitter_scrape', conn)
+
 
         
 
@@ -156,45 +191,32 @@ if __name__ == '__main__':
      
     twitter_client = TwitterClient()
     tweet_analyser = TweetAnalyser()
+    import_to_db = ImportToDB()
     api = twitter_client.get_twitter_client_api()
     
-    ticker = '$FB'
+    tickers = ['$FB', '$AAPL', '$AMZN', '$GOOGL', '$MSFT', '$TSLA', '$UBER', '$NFLX', '$BABA']
     
-    # Get tweets from Twitter API
-    popular_tweets = twitter_client.search_tweets(ticker, 500, 'popular')
-    recent_tweets = twitter_client.search_tweets(ticker, 500, 'recent')
-
-    # Process tweets to DataFrame
-    recent_df = tweet_analyser.tweets_to_dataframe(recent_tweets, ticker)
-    popular_df = tweet_analyser.tweets_to_dataframe(popular_tweets, ticker)
+    for ticker in tickers:
+        print(ticker)
+        # Get tweets from Twitter API
+        popular_tweets = twitter_client.search_tweets(ticker, 500, 'popular')
+        #recent_tweets = twitter_client.search_tweets(ticker, 500, 'recent')
     
-    # Check if full dataframe object exists, if not initiate dataframe
-    if 'full_df' not in locals():
-        full_df = recent_df
-    else:
-        full_df = full_df.append(recent_df)
+        # Process tweets to DataFrame
+        #recent_df = tweet_analyser.tweets_to_dataframe(recent_tweets, ticker)
+        popular_df = tweet_analyser.tweets_to_dataframe(popular_tweets, ticker)
+        
+        full_df = import_to_db.to_dataframe(popular_df)
+        
+        # Apply NLP on full_df
+        full_df['polarity'] = np.array([tweet_analyser.analyse_sentiment_polarity(tweet) for tweet in full_df['tweets']])
+        full_df['subjectivity'] = np.array([tweet_analyser.analyse_sentiment_subjectivity(tweet) for tweet in full_df['tweets']])
+        #full_df['tense'] = np.array([tweet_analyser.determine_tense_input(tweet) for tweet in full_df['tweets']])
+        
+        import_to_db.to_database(full_df)
+        
+        time.sleep(60)
     
-    # Add popular tweets to full_df, replace likes and retweets if popular tweet already exists in full_df
-    for index, row in popular_df.iterrows():
-        if row['id'] not in full_df['id'].tolist():
-            full_df = full_df.append(row, ignore_index=True)
-        else:
-            for index2, row2 in full_df.iterrows():
-                if row2['id'] == row['id']:
-                    full_df.iloc[index2, full_df.columns.get_loc('likes')] = row['likes']
-                    full_df.iloc[index2, full_df.columns.get_loc('retweets')] = row['retweets']
-
-    # Apply NLP on full_df
-    full_df['polarity'] = np.array([tweet_analyser.analyse_sentiment_polarity(tweet) for tweet in full_df['tweets']])
-    full_df['subjectivity'] = np.array([tweet_analyser.analyse_sentiment_subjectivity(tweet) for tweet in full_df['tweets']])
-    #full_df['tense'] = np.array([tweet_analyser.determine_tense_input(tweet) for tweet in full_df['tweets']])
-    
-    conn = sqlite3.connect('buytherumour.db')
-    c = conn.cursor()
-    
-    full_df.to_sql(name='full_twitter_scrape', con=conn, if_exists='append')
-   # pd.read_sql('select * from full_twitter_scrape', conn)
-
     
     
     
